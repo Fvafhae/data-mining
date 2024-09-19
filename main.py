@@ -23,6 +23,10 @@ class Node():
             return True
         else:
             return False
+    
+    def predict_y(self):
+        return np.round(np.mean(self.y))
+
 
 def tree_grow(x, y, nmin, minleaf):
     root = Node(x, y)
@@ -118,10 +122,19 @@ def split_data(x, y, feati, threshold):
 
     return (left_x, left_y, right_x, right_y)    
 
+def tree_pred(x, tr):
+    current_node = tr
+    while not current_node.is_leaf():
+        if x[current_node.split_feature] <= current_node.split_threshold:
+            current_node = current_node.left
+        else:
+            current_node = current_node.right
+    return current_node.predict_y()
+
 df = pd.read_csv("data.csv")
 x = df.drop(columns=['class'])
 y = df['class']
 
 tree = tree_grow(x.values, y.values, 2, 1)
-
+print(tree_pred(np.array([24,1,1,84,1,0]), tree))
 print(1)
