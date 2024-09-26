@@ -252,23 +252,14 @@ def tree_pred_b(x, trees):
 
 
 # TESTING
-df = pd.read_csv("pima.txt", sep = ',', header=None)
-x = df.iloc[:, :-1].values
-y = df[df.columns[-1]].values  
+df = pd.read_csv("eclipse-metrics-packages-2.0.csv", sep=';', header = 0)
+list_of_features = ['pre', 'ACD_avg', 'ACD_max', 'ACD_sum','FOUT_avg', 'FOUT_max', 'FOUT_sum', 'MLOC_avg', 'MLOC_max', 'MLOC_sum', 'NBD_avg', 'NBD_max', 'NBD_sum', 'NOCU', 'NOF_avg', 'NOF_max', 'NOF_sum', 'NOI_avg','NOI_max', 'NOI_sum', 'NOM_avg', 'NOM_max', 'NOM_sum', 'NOT_avg', 'NOT_max', 'NOT_sum', 'NSF_avg', 'NSF_max', 'NSF_sum', 'NSM_avg', 'NSM_max', 'NSM_sum', 'PAR_avg', 'PAR_max', 'PAR_sum', 'TLOC_avg', 'TLOC_max', 'TLOC_sum', 'VG_avg', 'VG_max', 'VG_sum']
+x = df[list_of_features].values  
+y = df['post'].values  
 
-tree = tree_grow(x, y, 20, 5, x.shape[1])
+tree = tree_grow(x, y, 15, 5, 41)
 pred_y = tree_pred(x, tree)
 
-# trees = tree_grow_b(x, y, 20, 5, 3, 10)
-# pred_y = tree_pred_b(x, trees)
-
-
-
-# tree = tree_grow(x, y, 20, 5, x.shape[1])
-# preds = []
-# for i in range(x.shape[0]):
-#     preds.append(tree_pred(x[i], tree))
-# pred_y = np.array(preds)
 
 print(classification_report(y, pred_y))
 
