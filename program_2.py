@@ -2,7 +2,7 @@ import random
 import pandas as pd
 import numpy as np
 from collections import Counter
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report
 
 class Node():
     """
@@ -37,7 +37,8 @@ class Node():
         Predicts the class label for the current node by returning the mean of the target values.
         This is used in leaf nodes to make predictions.
         """
-        return np.round(np.mean(self.y))
+        return Counter(self.y).most_common(1)[0][0]
+        # return np.round(np.mean(self.y))
 
 
 def tree_grow(x, y, nmin, minleaf, nfeat):
@@ -181,15 +182,22 @@ def tree_pred(x, tr):
     Returns:
     The predicted class label
     """
-    current_node = tr
-    # Go through the tree until reaching a leaf node
-    while not current_node.is_leaf():
-        if x[current_node.split_feature] <= current_node.split_threshold:
-            current_node = current_node.left
-        else:
-            current_node = current_node.right
-    # Return the prediction from the leaf node
-    return current_node.predict_y()
+    pred = []
+    for i in range(len(x)):
+        row = x[i]
+        
+        current_node = tr
+        # Go through the tree until reaching a leaf node
+        while not current_node.is_leaf():
+            if row[current_node.split_feature] <= current_node.split_threshold:
+                current_node = current_node.left
+            else:
+                current_node = current_node.right
+                
+        # Return the prediction from the leaf node
+        pred.append(current_node.predict_y())
+        
+    return np.array(pred)
 
 def tree_grow_b(x, y, nmin, minleaf, nfeat, m):
     """
@@ -232,7 +240,7 @@ def tree_pred_b(x, trees):
     y_pred: a vector containing the predicted class labels for each row in x
     """
     # Get predictions for each instance from all trees
-    predictions = np.array([tree_pred(x_i, tree) for tree in trees for x_i in x])
+    predictions = np.array([tree_pred(x, tree) for tree in trees])
     
     # Reshape predictions to have rows correspond to each instance and columns to each tree
     predictions = predictions.reshape(len(trees), len(x)).T
@@ -244,23 +252,29 @@ def tree_pred_b(x, trees):
 
 
 # TESTING
-df = pd.read_csv("pima.txt", sep = ',')
-x = df.iloc[:, :-1].values  
+df = pd.read_csv("pima.txt", sep = ',', header=None)
+x = df.iloc[:, :-1].values
 y = df[df.columns[-1]].values  
 
-trees = tree_grow_b(x, y, 20, 5, 3, 10)
-
-
-
 tree = tree_grow(x, y, 20, 5, x.shape[1])
-preds = []
-for i in range(x.shape[0]):
-    preds.append(tree_pred(x[i], tree))
-pred_y = np.array(preds)
+pred_y = tree_pred(x, tree)
+
+# trees = tree_grow_b(x, y, 20, 5, 3, 10)
+# pred_y = tree_pred_b(x, trees)
+
+
+
+# tree = tree_grow(x, y, 20, 5, x.shape[1])
+# preds = []
+# for i in range(x.shape[0]):
+#     preds.append(tree_pred(x[i], tree))
+# pred_y = np.array(preds)
+
+print(classification_report(y, pred_y))
 
 data = {
     'actual': y,  
-    'predicted': pred_y  
+    'predicted': pred_y
 }
 
 df = pd.DataFrame(data)
