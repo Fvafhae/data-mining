@@ -1,8 +1,9 @@
-import random
-import pandas as pd
-import numpy as np
 from collections import Counter
-from sklearn.metrics import confusion_matrix, classification_report
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import classification_report, confusion_matrix
+
 
 class Node():
     """
@@ -29,7 +30,9 @@ class Node():
     def is_leaf(self):
         """
         Checks if the current node is a leaf or has children nodes.
-        Returns True if the node is a leaf, otherwise False.
+        
+        Returns:
+            True if the node is a leaf, otherwise False.
         """
         return self.left is None and self.right is None
     
@@ -37,6 +40,9 @@ class Node():
         """
         Predicts the class label for the current node by returning the mean of the target values.
         This is used in leaf nodes to make predictions.
+        
+        Returns:
+            Most common label
         """
         return Counter(self.y).most_common(1)[0][0]
         # return np.round(np.mean(self.y))
@@ -98,17 +104,17 @@ def tree_grow_b(x, y, nmin, minleaf, nfeat, m):
     Arguments:
         x: the data matrix
         y: vector of class labels
-        nmin = minimum number of data points to attempt a split
-        minleaf = minimum number of data points in a leaf
-        nfeat = number of features to consider for the split
-        m = Number of bootstrap samples and trees to grow
+        nmin: minimum number of data points to attempt a split
+        minleaf: minimum number of data points in a leaf
+        nfeat: number of features to consider for the split
+        m: Number of bootstrap samples and trees to grow
     
     Returns:
-        trees = A list containing the m grown trees
+        trees: A list containing the m grown trees
     """
     trees = []
     n = len(y)  # number of samples
-    for i in range(m):
+    for _ in range(m):
         # Generate a bootstrap sample
         indices = np.random.choice(range(n), size=n, replace=True)
         x_bootstrap = x[indices]
@@ -126,11 +132,11 @@ def tree_pred_b(x, trees):
     The final prediction is determined by majority voting.
     
     Arguments:
-    x: the data matrix
-    trees: list of grown trees
+        x: the data matrix
+        trees: list of grown trees
     
     Returns:
-    y_pred: a vector containing the predicted class labels for each row in x
+        y_pred: a vector containing the predicted class labels for each row in x
     """
     # Get predictions for each instance from all trees
     predictions = np.array([tree_pred(x, tree) for tree in trees])
@@ -147,14 +153,19 @@ def tree_pred_b(x, trees):
 def grow(node, nmin, minleaf, nfeat):
     """
     Function that recursively grows the tree by splitting nodes
+
+    Arguments:
+        node: node to grow the decision tree further
+        nmin: minimum number of samples required to split a node
+        minleaf: minimum number of samples required in any leaf node
+        nfeat: number of random features to consider at each split (for random forests)
     """
     # Stop growing if the node contains fewer than nmin samples or if all target values are the same
     if len(node.y) < nmin or len(np.unique(node.y)) == 1:
         return
     
     # Select a random subset of nfeat features (for random forest) to consider for splitting
-    p = node.x.shape[1]  # Total number of features
-    feature_indices = np.random.choice(range(p), nfeat, replace=False)
+    feature_indices = np.random.choice(range(node.x.shape[1]), nfeat, replace=False)
     
     # Find the best split using only the selected features
     node.split_feature, node.split_threshold, split = search_best_split(node, minleaf, feature_indices)
@@ -177,14 +188,14 @@ def search_best_split(node, minleaf, feature_indices):
     Searches for the best feature and threshold to split the node.
     
     Arguments:
-    node: the current node being split
-    minleaf: minimum number of samples required in a leaf
-    feature_indices: indices of the random features to consider for splitting
+        node: the current node being split
+        minleaf: minimum number of samples required in a leaf
+        feature_indices: indices of the random features to consider for splitting
     
     Returns:
-    best_feature: the index of the best feature to split on
-    best_threshold: the threshold value for the best split
-    best_split: a tuple containing the split data for left and right child nodes
+        best_feature: the index of the best feature to split on
+        best_threshold: the threshold value for the best split
+        best_split: a tuple containing the split data for left and right child nodes
     """
     x = node.x
     y = np.array(node.y)
@@ -199,8 +210,8 @@ def search_best_split(node, minleaf, feature_indices):
         # Get all unique sorted values of the feature
         sorted_values = np.sort(np.unique(x[:, i]))
         # Create potential split points
-        splitpoints = (sorted_values[0:len(sorted_values)-1] + sorted_values[1:]) / 2
-        for j in splitpoints:
+        split_points = (sorted_values[0:len(sorted_values)-1] + sorted_values[1:]) / 2
+        for j in split_points:
             # Split the target values based on the current feature and split point
             left = y[x[:, i] <= j]
             right = y[x[:, i] > j]
@@ -212,21 +223,22 @@ def search_best_split(node, minleaf, feature_indices):
             # Keep track of the best split
             if quality < best_quality:
                 best_quality, best_split, best_feature, best_threshold = quality, split_data(x, y, i, j), i, j
+
     return best_feature, best_threshold, best_split
 
 
-def impurity(a):
+def impurity(labels_array):
     """
     Computes the impurity of a node.
     This implementation assumes binary classification.
     
     Arguments:
-    a: array of class labels at the node
+        labels_array: array of class labels at the node
     
     Returns:
-    Impurity score based on the proportion of the majority class
+        Impurity score based on the proportion of the majority class
     """
-    p = np.mean(a) # Proportion of class 1 for binary classification
+    p = np.mean(labels_array) # Proportion of class 1 for binary classification
     return p * (1 - p) #Gini-index
 
 
@@ -235,13 +247,13 @@ def split_data(x, y, feati, threshold):
     Splits the data into left and right subsets based on the given feature and threshold.
     
     Arguments:
-    x: the data matrix
-    y: the class label vector
-    feati: the feature index to split on
-    threshold: the threshold value for the split
+        x: the data matrix
+        y: the class label vector
+        feati: the feature index to split on
+        threshold: the threshold value for the split
     
     Returns:
-    A tuple containing the left and right subsets of both x and y
+        A tuple containing the left and right subsets of both x and y
     """
     left_x, right_x = [], []
     left_y, right_y = [], []
@@ -257,27 +269,28 @@ def split_data(x, y, feati, threshold):
     return (left_x, left_y, right_x, right_y)    
 
 
-# TESTING
-df = pd.read_csv("./data/cleaned/eclipse-metrics-packages-2.0.csv", header = 0)
-x = df.drop(columns=['post']).values
-y = df['post'].values
+if __name__ == "main":
+    # TESTING
+    df = pd.read_csv("./data/cleaned/eclipse-metrics-packages-2.0.csv", header = 0)
+    x = df.drop(columns=['post']).values
+    y = df['post'].values
 
-tree = tree_grow(x, y, 15, 5, 41)
-pred_y = tree_pred(x, tree)
+    tree = tree_grow(x, y, 15, 5, 41)
+    pred_y = tree_pred(x, tree)
 
 
-print(classification_report(y, pred_y))
+    print(classification_report(y, pred_y))
 
-data = {
-    'actual': y,  
-    'predicted': pred_y
-}
+    data = {
+        'actual': y,  
+        'predicted': pred_y
+    }
 
-df = pd.DataFrame(data)
+    df = pd.DataFrame(data)
 
-conf_matrix = confusion_matrix(df['actual'], df['predicted'])
+    conf_matrix = confusion_matrix(df['actual'], df['predicted'])
 
-conf_matrix_df = pd.DataFrame(conf_matrix, 
-                              index=['Actual Negative (0)', 'Actual Positive (1)'],
-                              columns=['Predicted Negative (0)', 'Predicted Positive (1)'])
-print(conf_matrix_df)
+    conf_matrix_df = pd.DataFrame(conf_matrix, 
+                                index=['Actual Negative (0)', 'Actual Positive (1)'],
+                                columns=['Predicted Negative (0)', 'Predicted Positive (1)'])
+    print(conf_matrix_df)
