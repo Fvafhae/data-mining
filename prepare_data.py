@@ -10,8 +10,8 @@ def clean_data(path):
     list_of_features.extend([x for x in df.columns.values if x.split('_')[0] in metrics])
     clean_df = df.loc[:, list_of_features]
     clean_df['post'] = df['post']
-    clean_df.loc[clean_df['post'] > 0] = 1
-
+    clean_df.loc[clean_df['post'] > 0, 'post'] = 1
+    
     if not os.path.exists('./data/cleaned'):
         os.makedirs('./data/cleaned')
         
