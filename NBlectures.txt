@@ -1,4 +1,4 @@
-setwd("C:/G_G_Personal/z-python/uu_mdm/Lecture_Naive Bayes")
+setwd("Set the directory")
 #install.packages("tm")
 library(tm)
 reviews.neg <- VCorpus(DirSource("train/neg",
