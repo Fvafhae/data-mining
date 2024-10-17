@@ -1,0 +1,188 @@
+setwd("C:/G_G_Personal/z-python/uu_mdm/Lecture_Naive Bayes")
+#install.packages("tm")
+library(tm)
+reviews.neg <- VCorpus(DirSource("train/neg",
+                                 encoding="UTF-8"))
+reviews.pos <- VCorpus(DirSource("train/pos",
+                                 encoding="UTF-8"))
+reviews.all <- c(reviews.neg,reviews.pos)
+
+# create label vector (0=negative, 1=positive)
+labels <- c(rep(0,12500),rep(1,12500))
+reviews.all
+#Analysis of Movie ReviewsThe first review before pre-processing:
+as.character(reviews.all[[1]])
+
+#PRE PROCESSING
+# Remove punctuation marks (comma's, etc.)
+reviews.all <- tm_map(reviews.all,removePunctuation)
+# Make all letters lower case
+reviews.all <- tm_map(reviews.all,content_transformer(tolower))
+# Remove stopwords
+reviews.all <- tm_map(reviews.all, removeWords,
+                        stopwords("english"))
+# Remove numbers
+reviews.all <- tm_map(reviews.all,removeNumbers)
+# Remove excess whitespace
+reviews.all <- tm_map(reviews.all,stripWhitespace)
+as.character(reviews.all[[1]])
+
+#Analysis of Movie Reviews
+# draw training sample (stratified)
+# draw 8000 negative reviews at ra
+index.neg <- sample(12500,8000)
+# draw 8000 positive reviews at random
+index.pos <- 12500+sample(12500,8000)
+index.train <- c(index.neg,index.pos)
+
+# create document-term matrix from training corpus
+train.dtm <- DocumentTermMatrix(reviews.all[index.train])
+dim(train.dtm)
+
+
+#We've got 92,819 features. Perhaps this is a bit too much.
+# remove terms that occur in less than 5% of the documents
+# (so-called sparse terms)
+train.dtm <- removeSparseTerms(train.dtm,0.95)
+dim(train.dtm)
+
+# view a small part of the document-term matrix
+inspect(train.dtm[100:110,80:85])
+
+train.mnb <-  function(dtm,labels){
+  call <- match.call()
+  V <- ncol(dtm)
+  N <- nrow(dtm)
+  prior <- table(labels)/N
+  labelnames <- names(prior)
+  nclass <- length(prior)
+  cond.probs <- matrix(nrow=V,ncol=nclass)
+  dimnames(cond.probs)[[1]] <- dimnames(dtm)[[2]]
+  dimnames(cond.probs)[[2]] <- labelnames
+  index <- list(length=nclass)
+  for(j in 1:nclass){
+    index[[j]] <- c(1:N)[labels == labelnames[j]]
+  }
+  for(i in 1:V){
+    for(j in 1:nclass){
+      cond.probs[i,j] <- (sum(dtm[index[[j]],i])+1)/(sum(dtm[index[[j]],])+V)
+    }
+  }
+  list(call=call,prior=prior,cond.probs=cond.probs)
+}
+
+#Multinomial naive Bayes in R: Prediction
+predict.mnb = function (model,dtm){
+  classlabels <- dimnames(model$cond.probs)[[2]]
+  logprobs <- dtm %*% log(model$cond.probs)
+  N <- nrow(dtm)
+  nclass <- ncol(model$cond.probs)
+  logprobs <- logprobs+matrix(nrow=N,ncol=nclass,log(model$prior),byrow=T)
+  classlabels[max.col(logprobs)]
+}
+
+#Application of Multinomial naive Bayes to Movie Reviews
+# Train multinomial naive Bayes model
+reviews.mnb <- train.mnb(as.matrix(train.dtm),labels[index.train])
+# create document term matrix for test set
+# we only extract words from the training vocabulary!
+test.dtm <- DocumentTermMatrix(reviews.all[-index.train],
+                                 list(dictionary=dimnames(train.dtm)[[2]]))
+dim(test.dtm) #9000 310
+reviews.mnb.pred <- predict.mnb(reviews.mnb,as.matrix(test.dtm))
+table(reviews.mnb.pred,labels[-index.train])
+#reviews.mnb.pred    0    1
+#               0 3454  860
+#               1 1046 3640
+# compute accuracy on test set: about 79% correct
+(3454 + 3640)/(3454 + 3640 + 860 + 1046)
+#[1]  0.7882222
+
+#Compute Mutual Information
+# load library "entropy"
+#install.packages("entropy")
+library(entropy)
+# convert document term matrix to binary (term present/absent)
+train.dtm.bin <- as.matrix(train.dtm)>0
+# compute mutual information of each term with class label
+train.mi <- apply(as.matrix(train.dtm.bin),2,
+                    function(x,y){mi.plugin(table(x,y)/length(y),unit="log2")},
+                    labels[index.train])
+# sort the indices from high to low mutual information
+train.mi.order <- order(train.mi,decreasing=T)
+# show the five terms with highest mutual information
+train.mi[train.mi.order[1:5]]
+#       bad      worst      waste      awful      great 
+# 0.05543200 0.05223501 0.03664008 0.02952152 0.02826326 
+
+#Using the top-50 features
+# train on the 50 best features
+revs.mnb.top50 <- train.mnb(as.matrix(train.dtm)[,train.mi.order[1:50]],
+                              labels[index.train])
+# predict on the test set
+revs.mnb.top50.pred <- predict.mnb(revs.mnb.top50,
+                                     as.matrix(test.dtm)[,train.mi.order[1:50]])
+# show the confusion matrix
+table(revs.mnb.top50.pred,labels[-index.train])
+#revs.mnb.top50.pred    0    1
+#                   0 3505 1040
+#                   1  995 3460
+# accuracy is a bit worse compared to using all features
+(3505 + 3460)/(3505 + 3460 + 1040 + 995)
+# 0.7738889
+
+## load the required packages
+library(rpart)
+#install.packages("rpart.plot")
+library(rpart.plot)
+# grow the tree
+ reviews.rpart <- rpart(label~.,
+                         data=data.frame(as.matrix(train.dtm),
+                                         label=labels[index.train]),cp=0,method="class")
+# plot cv-error of pruning sequence
+plotcp(reviews.rpart)
+#Classification Trees
+# simple tree for plotting
+reviews.rpart.pruned <- prune(reviews.rpart,cp=5.0000e-03)
+rpart.plot(reviews.rpart.pruned)
+# tree with lowest cv error
+reviews.rpart.pruned <- prune(reviews.rpart,cp=5.833333e-04)
+# make predictions on the test set
+reviews.rpart.pred <- predict(reviews.rpart.pruned,
+                                newdata=data.frame(as.matrix(test.dtm)),type="class")
+# show confusion matrix
+table(reviews.rpart.pred,labels[-index.train])
+#reviews.rpart.pred    0    1
+#                   0 3199 1078
+#                   1 1301 3422
+
+# accuracy is worse than naive Bayes!
+(3199 + 3422)/(3199 + 3422+ 1078 +1301)
+#[1] 0.7356667
+
+## load the required packages
+#install.packages("randomForest")
+library(randomForest)
+# train random forest with default settings: 500 trees and mtry = 17
+reviews.rf <- randomForest(as.factor(label)~.,
+                             data=data.frame(as.matrix(train.dtm),label=labels[index.train]))
+# make predictions
+reviews.rf.pred <- predict(reviews.rf,newdata=data.frame(as.matrix(test.dtm)))
+# show confusion matrix
+table(reviews.rf.pred,labels[-index.train])
+#reviews.rf.pred    0    1
+#               0 3486  816
+#               1 1014 3684
+
+# compute accuracy: only slightly better than naive Bayes!
+(3486 + 3684)/(3486 + 3684 + 816 + 1014)
+#[1] 0.7966667
+
+#LOGISTIC REGRESSIOn
+#How to in R
+library(lme4)
+library(glm)
+data <- data.frame(success = c(1,2,3,4,5), month.exp = c(23,23,11,24,15))
+
+prog.logreg <- glm(success ??? month.exp, data=prog.dat, family=binomial)
+summary(prog.logreg)
